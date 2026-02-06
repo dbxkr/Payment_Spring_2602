@@ -3,6 +3,9 @@ package com.example.payment.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.ser.std.ToStringSerializer;
+
 import com.github.f4b6a3.tsid.TsidCreator;
 
 @Entity
@@ -11,6 +14,7 @@ import com.github.f4b6a3.tsid.TsidCreator;
 public class Member {
 
     @Id
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     private String name;

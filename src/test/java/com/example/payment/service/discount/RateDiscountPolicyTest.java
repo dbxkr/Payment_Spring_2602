@@ -2,7 +2,7 @@ package com.example.payment.service.discount;
 
 import com.example.payment.domain.Grade;
 import com.example.payment.domain.Member;
-import com.example.payment.service.DiscountPolicy;
+import com.example.payment.domain.PaymentMethod; // 추가됨
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,22 +10,33 @@ import static org.assertj.core.api.Assertions.*;
 
 class RateDiscountPolicyTest {
 
-    // 테스트할 대상을 직접 생성 (스프링 없이 순수 자바 코드로 테스트 -> 속도가 엄청 빠름)
-    DiscountPolicy discountPolicy = new RateDiscountPolicy();
+    RateDiscountPolicy discountPolicy = new RateDiscountPolicy();
 
     @Test
     @DisplayName("VVIP는 10% 할인이 적용되어야 한다")
     void vvip_o() {
+        // given
         Member member = new Member("memberVVIP", Grade.VVIP);
-        int discount = discountPolicy.discount(member, 10000);
-        assertThat(discount).isEqualTo(1000);
+        
+        // when
+        // PaymentMethod 추가, 리턴 타입 변경
+        DiscountResult result = discountPolicy.discount(member, 20000, PaymentMethod.CREDIT_CARD);
+        
+        // then
+        // 20000 * 10% = 2000
+        assertThat(result.getTotalDiscountAmount()).isEqualTo(2000);
     }
 
     @Test
     @DisplayName("VVIP가 아니면 할인이 적용되지 않아야 한다")
     void vvip_x() {
+        // given
         Member member = new Member("memberBASIC", Grade.NORMAL);
-        int discount = discountPolicy.discount(member, 10000);
-        assertThat(discount).isEqualTo(0);
+        
+        // when
+        DiscountResult result = discountPolicy.discount(member, 20000, PaymentMethod.CREDIT_CARD);
+        
+        // then
+        assertThat(result.getTotalDiscountAmount()).isEqualTo(0);
     }
 }

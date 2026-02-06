@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>결제 시스템 테스트</title>
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background-color: #f4f4f4; }
+        .container { background-color: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        input, select { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; transition: border-color 0.3s; }
+        input:focus, select:focus { border-color: #007bff; outline: none; }
+        button { width: 100%; padding: 14px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 18px; font-weight: bold; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        #result { margin-top: 25px; background: #2d2d2d; color: #fff; padding: 20px; border-radius: 8px; white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; }
+        .error { color: #ff6b6b; font-weight: bold; }
+        .badge { background: #28a745; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-left: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>💳 결제 키오스크</h2>
+    
+    <div class="form-group">
+        <label for="memberSelect">회원 선택 (테스트 계정)</label>
+        <select id="memberSelect">
+            <option value="" disabled selected>⏳ 회원 목록 로딩 중...</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>상품명</label>
+        <input type="text" id="itemName" value="RTX 5090" placeholder="상품명">
+    </div>
+
+    <div class="form-group">
+        <label>가격 (원)</label>
+        <input type="number" id="itemPrice" value="10050" placeholder="가격">
+    </div>
+
+    <div class="form-group">
+        <label>결제 수단</label>
+        <select id="paymentMethod">
+            <option value="CREDIT_CARD">💳 신용카드 (기본)</option>
+            <option value="POINT" selected>🅿️ 포인트 (5% 추가할인)</option>
+        </select>
+    </div>
+
+    <button onclick="order()">결제하기</button>
+
+    <div id="result" style="display:none;"></div>
+</div>
+
+<script>
+    // 1. 페이지 로드 시 회원 목록 가져오기
+    document.addEventListener('DOMContentLoaded', async () => {
+        const memberSelect = document.getElementById('memberSelect');
+        
+        try {
+            const response = await fetch('/api/orders/testmembers'); 
+            
+            if (!response.ok) throw new Error(`API 호출 실패 (${response.status})`);
+            
+            const members = await response.json();
+            
+            // 기존 옵션 비우기
+            memberSelect.innerHTML = '';
+            
+            if (members.length === 0) {
+                memberSelect.innerHTML = '<option disabled>조회된 테스트 회원이 없습니다.</option>';
+                return;
+            }
+
+            // 받아온 회원들로 옵션 채우기
+            members.forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.id; 
+                option.textContent = `${member.name} (${member.grade})`; 
+                memberSelect.appendChild(option);
+            });
+            
+            // 첫 번째 회원 자동 선택
+            memberSelect.selectedIndex = 0;
+
+        } catch (error) {
+            console.error('회원 목록 로딩 에러:', error);
+            memberSelect.innerHTML = '<option disabled selected>❌ 회원 목록 로딩 실패 (콘솔 확인)</option>';
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').innerHTML = `<span class="error">서버 연결 실패: ${error.message}<br>@Profile("local") 설정이 활성화되었는지 확인해주세요.</span>`;
+        }
+    });
+
+    // 2. 주문 요청 함수
+    async function order() {
+        const memberId = document.getElementById('memberSelect').value;
+        const resultDiv = document.getElementById('result');
+
+        if (!memberId) {
+            alert("회원을 선택해주세요!");
+            return;
+        }
+
+        const data = {
+            memberId: memberId,
+            itemName: document.getElementById('itemName').value,
+            itemPrice: document.getElementById('itemPrice').value,
+            paymentMethod: document.getElementById('paymentMethod').value
+        };
+
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '⏳ 결제 처리 중...';
+
+        try {
+            const response = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text(); // 서버 에러 메시지 읽기
+                throw new Error(errorText || '서버 오류 발생');
+            }
+
+            const order = await response.json();
+            
+            // 영수증 출력
+            let html = `<strong>✅ 주문 성공! (Order ID: ${order.id})</strong>\n`;
+            html += `------------------------------------------\n`;
+            html += `상품명   : ${order.itemName}\n`;
+            html += `주문금액 : ${Number(order.itemPrice).toLocaleString()}원\n`;
+            html += `할인금액 : <span style="color:#ff6b6b">-${Number(order.discountPrice).toLocaleString()}원</span>\n`;
+            html += `최종결제 : <strong>${Number(order.itemPrice - order.discountPrice).toLocaleString()}원</strong>\n`;
+            html += `------------------------------------------\n`;
+            html += `[할인 상세 내역]\n`;
+            
+            if (order.discountRecords && order.discountRecords.length > 0) {
+                order.discountRecords.forEach(record => {
+                    html += `- ${record.policyName}: ${Number(record.discountAmount).toLocaleString()}원\n`;
+                });
+            } else {
+                html += `- 적용된 할인 없음\n`;
+            }
+
+            resultDiv.innerHTML = html;
+
+        } catch (error) {
+            resultDiv.innerHTML = `<span class="error">❌ 오류 발생: ${error.message}</span>`;
+        }
+    }
+</script>
+
+</body>
+</html>

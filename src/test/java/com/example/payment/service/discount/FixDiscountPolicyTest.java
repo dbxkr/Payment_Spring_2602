@@ -2,6 +2,7 @@ package com.example.payment.service.discount;
 
 import com.example.payment.domain.Grade;
 import com.example.payment.domain.Member;
+import com.example.payment.domain.PaymentMethod; // 추가됨
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,16 +17,13 @@ class FixDiscountPolicyTest {
     void vip_amount_cut_line_ok() {
         // given
         Member member = new Member("memberVIP", Grade.VIP);
-        
-        // 최소할인금액을 불러옴
-        int minAmount = discountPolicy.getMinOrderAmount(); 
+        int minAmount = discountPolicy.getMinOrderAmount();
 
-        // when: 딱 그 기준 금액만큼 주문했을 때
-        int discount = discountPolicy.discount(member, minAmount);
+        // when: 파라미터 추가(PaymentMethod), 리턴 타입 변경(DiscountResult)
+        DiscountResult result = discountPolicy.discount(member, minAmount, PaymentMethod.CREDIT_CARD);
 
-        // then: 할인이 적용되어야 함
-        // (할인 금액도 하드코딩 대신 객체에서 가져오거나 Rule에서 가져오는 게 더 완벽함)
-        assertThat(discount).isGreaterThan(0); 
+        // then: 객체 안에서 금액 꺼내서 비교
+        assertThat(result.getTotalDiscountAmount()).isGreaterThan(0);
     }
 
     @Test
@@ -35,19 +33,21 @@ class FixDiscountPolicyTest {
         Member member = new Member("memberVIP", Grade.VIP);
         int minAmount = discountPolicy.getMinOrderAmount();
 
-        // when: 기준 금액에서 10원이 모자란 경우
+        // when
         int price = minAmount - 10;
-        int discount = discountPolicy.discount(member, price);
+        DiscountResult result = discountPolicy.discount(member, price, PaymentMethod.CREDIT_CARD);
 
-        // then: 얄짤없이 할인 0원
-        assertThat(discount).isEqualTo(0);
+        // then
+        assertThat(result.getTotalDiscountAmount()).isEqualTo(0);
     }
     
     @Test
     @DisplayName("일반 회원은 금액 상관없이 할인 없다")
     void basic_member_fail() {
         Member member = new Member("basic", Grade.NORMAL);
-        int discount = discountPolicy.discount(member, 20000);
-        assertThat(discount).isEqualTo(0);
+        
+        DiscountResult result = discountPolicy.discount(member, 20000, PaymentMethod.CREDIT_CARD);
+        
+        assertThat(result.getTotalDiscountAmount()).isEqualTo(0);
     }
 }
